@@ -62,7 +62,6 @@ class MPCVelControl:
 
         if u_target is None:
             u_target = self.us
-
         u0[self.mpc_x.u_ids], x_traj[self.mpc_x.x_ids], u_traj[self.mpc_x.u_ids] = (
             self.mpc_x.get_u(
                 x0[self.mpc_x.x_ids],
