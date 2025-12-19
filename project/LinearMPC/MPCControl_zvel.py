@@ -1,7 +1,8 @@
 import numpy as np
 
-from .MPCControl_base import MPCControl_base
+from .MPCControl_base import MPCControl_base, max_invariant_set
 from mpt4py import Polyhedron
+import cvxpy as cp
 
 
 class MPCControl_zvel(MPCControl_base):
@@ -19,6 +20,10 @@ class MPCControl_zvel(MPCControl_base):
         """
         #################################################
         # YOUR CODE HERE
+
+        print("setting up zvel")
+        self.Q = 5 * np.eye(self.nx)
+        self.R = 1 * np.eye(self.nu)
 
         # Input constraints: u in U = { u | Mu <= m }
         # P_avg: 40 <= P_avg <= 80
@@ -38,26 +43,52 @@ class MPCControl_zvel(MPCControl_base):
         # YOUR CODE HERE
         #################################################
 
-    # def get_u(
-    #     self, x0: np.ndarray, x_target: np.ndarray = None, u_target: np.ndarray = None
-    # ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    #     #################################################
-    #     # YOUR CODE HERE
-        
-    #     if x_target is None:
-    #         x_target = self.xs
-    #     if u_target is None:
-    #         u_target = self.us
+    def get_u(
+        self, x0: np.ndarray, x_target: np.ndarray = None, u_target: np.ndarray = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        #################################################
+        # YOUR CODE HERE
 
-    #     self.x0_var.value = x0 - x_target
-    #     self.ocp.solve()
-    #     u0 = self.u_var.value[:, 0] + u_target
-    #     x_traj = self.x_var.value[:, :] + x_target.reshape(-1, 1)
-    #     u_traj = self.u_var.value[:, :] + u_target.reshape(-1, 1)
-    #     # YOUR CODE HERE
-    #     #################################################
+        if x_target is None:
+            x_target = self.xs
+        if u_target is None:
+            u_target = self.us
 
-    #     return u0, x_traj, u_traj
+        self.x0_var.value = x0 - x_target
+
+        # Constraints
+        self.constraints = []
+        # Initial condition
+        self.constraints.append(self.x_var[:, 0] == self.x0_var)
+        # System dynamics
+        self.constraints.append(self.x_var[:, 1:] == self.A @ self.x_var[:, :-1] + self.B @ self.u_var)
+
+        # State constraints for delta form
+        self.constraints.append(self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1))
+
+        # Input constraints for delta form
+        self.constraints.append(self.U.A @ self.u_var <= (self.U.b - self.U.A @ u_target).reshape(-1, 1))
+
+        # Terminal Constraints (slightly larger than the original form)
+        KU = Polyhedron.from_Hrep(self.U.A @ self.K, self.U.b - self.U.A @ u_target)
+
+        X = Polyhedron.from_Hrep(self.X.A, self.X.b - self.X.A @ x_target)
+
+        self.O_inf = max_invariant_set(self.A_cl, X.intersect(KU))
+        self.constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
+
+        self.ocp = cp.Problem(cp.Minimize(self.cost), self.constraints)
+
+        self.ocp.solve()
+        # import IPython; IPython.embed();
+        u0 = self.u_var.value[:, 0] + u_target
+        x_traj = self.x_var.value[:, :] + x_target.reshape(-1, 1)
+        u_traj = self.u_var.value[:, :] + u_target.reshape(-1, 1)
+
+        # YOUR CODE HERE
+        #################################################
+
+        return u0, x_traj, u_traj
 
     def setup_estimator(self):
         # FOR PART 5 OF THE PROJECT

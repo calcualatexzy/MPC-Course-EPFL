@@ -11,7 +11,7 @@ def max_invariant_set(A_cl, X: Polyhedron, max_iter = 30) -> Polyhedron:
 	O = X
 	itr = 1
 	converged = False
-	print('Computing maximum invariant set ...')
+	# print('Computing maximum invariant set ...')
 	while itr < max_iter:
 		Oprev = O
 		F, f = O.A, O.b
@@ -21,11 +21,11 @@ def max_invariant_set(A_cl, X: Polyhedron, max_iter = 30) -> Polyhedron:
 		if O == Oprev:
 			converged = True
 			break
-		print('Iteration {0}... not yet converged'.format(itr))
+		# print('Iteration {0}... not yet converged'.format(itr))
 		itr += 1
 	
-	if converged:
-		print('Maximum invariant set successfully computed after {0} iterations.'.format(itr))
+	# if converged:
+	# 	print('Maximum invariant set successfully computed after {0} iterations.'.format(itr))
 	return O
 
 
@@ -79,7 +79,7 @@ class MPCControl_base:
     def _setup_parameters(self) -> None:
 
         self.Q = 0.1 * np.eye(self.nx)
-        self.R = np.eye(self.nu)
+        self.R = 0.1 * np.eye(self.nu)
 
         self.params = {}
         # Input constraints
@@ -110,27 +110,25 @@ class MPCControl_base:
         self.x0_var = cp.Parameter((self.nx,), name='x0')
 
         # Costs 
-        cost = 0
+        self.cost = 0
 
         for i in range(self.N):
-            cost += cp.quad_form(self.x_var[:, i], self.Q)
-            cost += cp.quad_form(self.u_var[:, i], self.R)
-        cost += cp.quad_form(self.x_var[:, -1], self.Qf)
+            self.cost += cp.quad_form(self.x_var[:, i], self.Q)
+            self.cost += cp.quad_form(self.u_var[:, i], self.R)
+        self.cost += cp.quad_form(self.x_var[:, -1], self.Qf)
 
         # Constraints
-        constraints = []
+        self.constraints = []
         # Initial condition
-        constraints.append(self.x_var[:, 0] == self.x0_var)
+        self.constraints.append(self.x_var[:, 0] == self.x0_var)
         # System dynamics
-        constraints.append(self.x_var[:, 1:] == self.A @ self.x_var[:, :-1] + self.B @ self.u_var)
+        self.constraints.append(self.x_var[:, 1:] == self.A @ self.x_var[:, :-1] + self.B @ self.u_var)
         # State constraints
-        constraints.append(self.X.A @ self.x_var[:, :-1] <= self.X.b.reshape(-1, 1))
+        # self.constraints.append(self.X.A @ self.x_var[:, :-1] <= self.X.b.reshape(-1, 1))
         # Input constraints
-        constraints.append(self.U.A @ self.u_var <= self.U.b.reshape(-1, 1))
+        # self.constraints.append(self.U.A @ self.u_var <= self.U.b.reshape(-1, 1))
         # Terminal Constraints
-        constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
-
-        self.ocp = cp.Problem(cp.Minimize(cost), constraints)
+        self.constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
 
         # YOUR CODE HERE
         #################################################
@@ -155,8 +153,25 @@ class MPCControl_base:
             u_target = self.us
 
         self.x0_var.value = x0 - x_target
-        import IPython; IPython.embed()
+
+        # State constraints for delta form
+        self.constraints.append(self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1))
+
+        # Input constraints for delta form
+        self.constraints.append(self.U.A @ self.u_var <= (self.U.b - self.U.A @ u_target).reshape(-1, 1))
+
+        # Terminal Constraints (slightly larger than the original form)
+        # KU = Polyhedron.from_Hrep(self.U.A @ self.K, self.U.b - self.U.A @ u_target)
+
+        # X = Polyhedron.from_Hrep(self.X.A, self.X.b - self.X.A @ x_target)
+
+        # self.O_inf = max_invariant_set(self.A_cl, X.intersect(KU))
+        # self.constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
+
+        self.ocp = cp.Problem(cp.Minimize(self.cost), self.constraints)
+
         self.ocp.solve()
+        # import IPython; IPython.embed();
         u0 = self.u_var.value[:, 0] + u_target
         x_traj = self.x_var.value[:, :] + x_target.reshape(-1, 1)
         u_traj = self.u_var.value[:, :] + u_target.reshape(-1, 1)

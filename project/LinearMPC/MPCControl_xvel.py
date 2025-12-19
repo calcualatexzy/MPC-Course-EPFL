@@ -10,12 +10,15 @@ class MPCControl_xvel(MPCControl_base):
 
     def _setup_controller(self) -> None:
         """
-        x: [omega_y, beta, v_x, x]
+        x: [omega_y, beta, v_x]
         u: delta_2
         """
         #################################################
         # YOUR CODE HERE
-
+        print("setting up xvel")
+        self.Q = 1 * np.eye(self.nx)
+        self.R = 1 * np.eye(self.nu)
+        
         # Input constraints: u in U = { u | Mu <= m }
         # delta_2: -0.26 <= delta_2 <= 0.26
         self.M = np.array([[1], [-1]])  # [delta_2 <= delta_max, -delta_2 <= delta_max]
@@ -38,23 +41,14 @@ class MPCControl_xvel(MPCControl_base):
         # YOUR CODE HERE
         #################################################
 
-    # def get_u(
-    #     self, x0: np.ndarray, x_target: np.ndarray = None, u_target: np.ndarray = None
-    # ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    #     #################################################
-    #     # YOUR CODE HERE
-    #     if x_target is None:
-    #         x_target = self.xs
-    #     if u_target is None:
-    #         u_target = self.us
+    def get_u(
+        self, x0: np.ndarray, x_target: np.ndarray = None, u_target: np.ndarray = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        #################################################
+        # YOUR CODE HERE
+        
 
-    #     self.x0_var.value = x0 - x_target
-    #     self.ocp.solve()
-    #     u0 = self.u_var.value[:, 0] + u_target
-    #     x_traj = self.x_var.value[:, :] + x_target.reshape(-1, 1)
-    #     u_traj = self.u_var.value[:, :] + u_target.reshape(-1, 1)
+        # YOUR CODE HERE
+        #################################################
 
-    #     # YOUR CODE HERE
-    #     #################################################
-
-    #     return u0, x_traj, u_traj
+        return super(MPCControl_xvel, self).get_u(x0, x_target, u_target)

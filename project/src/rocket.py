@@ -428,6 +428,8 @@ class Rocket(RocketBase):
             mpc.estimate_parameters(x_cl[:, k:k+2], u_cl[:, k:k+1])
             t_cl[k+1] = t_cl[k] + self.Ts
             print('', end='\n')
+            # print(f"x_state: {x_cl[:, k]}")
+            # print(f"x_target: {x_target[:, k]}")
 
 
         return t_cl, x_cl, u_cl, t_ol, x_ol, u_ol, x_target
