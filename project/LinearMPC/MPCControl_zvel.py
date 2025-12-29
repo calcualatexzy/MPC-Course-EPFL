@@ -22,8 +22,8 @@ class MPCControl_zvel(MPCControl_base):
         # YOUR CODE HERE
 
         print("setting up zvel")
-        self.Q = 5 * np.eye(self.nx)
-        self.R = 1 * np.eye(self.nu)
+        self.Q = np.diag([10])
+        self.R = np.diag([0.5])
 
         # Input constraints: u in U = { u | Mu <= m }
         # P_avg: 40 <= P_avg <= 80
@@ -94,9 +94,37 @@ class MPCControl_zvel(MPCControl_base):
         # FOR PART 5 OF THE PROJECT
         ##################################################
         # YOUR CODE HERE
+        # x = A x + B u + Bd d (x = [v_z], Bd = B)
+        # y = C x + Cd d (y = v_z)
+        self.ny = 1
+        self.nd = 1
 
-        self.d_estimate = ...
-        self.d_gain = ...
+        self.d_estimate = np.zeros((self.nd, 1))
+        self.d_gain = 1.0
+
+        poles = np.array([0.5, 0.6])
+
+        C = np.ones((self.ny, self.nx))
+        Bd = self.B
+
+        # A_hat = [A  Bd;  0  I]
+        self.A_hat = np.vstack((
+            np.hstack((self.A, Bd)),
+            np.hstack((np.zeros((self.ny, self.nx)), np.eye(self.ny)))
+        ))
+
+        # B_hat = [B; 0]
+        self.B_hat = np.vstack((self.B, np.zeros((self.nd, self.nu))))
+
+        # C_hat = [C  Cd]
+        self.C_hat = np.hstack((C, np.ones((self.ny,self.nd))))
+
+        from scipy.signal import place_poles
+        res = place_poles(self.A_hat.T, self.C_hat.T, poles)
+        self.L = -res.gain_matrix.T
+
+        self.x_hat = np.ndarray((1, self.nx))
+        self.d_estimate = np.ndarray((1, self.nd))
 
         # YOUR CODE HERE
         ##################################################
@@ -105,6 +133,8 @@ class MPCControl_zvel(MPCControl_base):
         # FOR PART 5 OF THE PROJECT
         ##################################################
         # YOUR CODE HERE
-        self.d_estimate = ...
+        tmp = self.A_hat @ np.concatenate((self.x_hat, self.d_estimate)) + self.B_hat @ u_data + self.L @ (self.C_hat @ self.x_hat + self.d_gain * self.d_estimate - self.C_hat @ x_data)
+        self.x_hat = tmp[:self.nx]
+        self.d_estimate = tmp[self.nx:]
         # YOUR CODE HERE
         ##################################################

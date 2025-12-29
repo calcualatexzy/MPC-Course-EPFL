@@ -83,13 +83,14 @@ class MPCControl_base:
 
         self.params = {}
         # Input constraints
-        self.params['delta'] = (-0.26, 0.26)
-        self.params['P_avg'] = (40, 80) 
-        self.params['P_diff'] = (-20, 20)
+        safety_margin = 0.01
+        self.params['delta'] = (-np.deg2rad(15)+safety_margin, np.deg2rad(15)-safety_margin)
+        self.params['P_avg'] = (40+safety_margin, 80-safety_margin) 
+        self.params['P_diff'] = (-20+safety_margin, 20-safety_margin)
         
         # State constraints
-        self.params['alpha'] = (-0.1745, 0.1745)
-        self.params['beta'] = (-0.1745, 0.1745)
+        self.params['alpha'] = (-np.deg2rad(10)+safety_margin, np.deg2rad(10)-safety_margin)
+        self.params['beta'] = (-np.deg2rad(10)+safety_margin, np.deg2rad(10)-safety_margin)
         
 
     def _setup_controller(self) -> None:
@@ -117,19 +118,6 @@ class MPCControl_base:
             self.cost += cp.quad_form(self.u_var[:, i], self.R)
         self.cost += cp.quad_form(self.x_var[:, -1], self.Qf)
 
-        # Constraints
-        self.constraints = []
-        # Initial condition
-        self.constraints.append(self.x_var[:, 0] == self.x0_var)
-        # System dynamics
-        self.constraints.append(self.x_var[:, 1:] == self.A @ self.x_var[:, :-1] + self.B @ self.u_var)
-        # State constraints
-        # self.constraints.append(self.X.A @ self.x_var[:, :-1] <= self.X.b.reshape(-1, 1))
-        # Input constraints
-        # self.constraints.append(self.U.A @ self.u_var <= self.U.b.reshape(-1, 1))
-        # Terminal Constraints
-        self.constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
-
         # YOUR CODE HERE
         #################################################
 
@@ -154,6 +142,19 @@ class MPCControl_base:
 
         self.x0_var.value = x0 - x_target
 
+        # Constraints
+        self.constraints = []
+        # Initial condition
+        self.constraints.append(self.x_var[:, 0] == self.x0_var)
+        # System dynamics
+        self.constraints.append(self.x_var[:, 1:] == self.A @ self.x_var[:, :-1] + self.B @ self.u_var)
+        # State constraints
+        # self.constraints.append(self.X.A @ self.x_var[:, :-1] <= self.X.b.reshape(-1, 1))
+        # Input constraints
+        # self.constraints.append(self.U.A @ self.u_var <= self.U.b.reshape(-1, 1))
+        # Terminal Constraints
+        self.constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
+
         # State constraints for delta form
         self.constraints.append(self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1))
 
@@ -171,7 +172,7 @@ class MPCControl_base:
         self.ocp = cp.Problem(cp.Minimize(self.cost), self.constraints)
 
         self.ocp.solve()
-        # import IPython; IPython.embed();
+
         u0 = self.u_var.value[:, 0] + u_target
         x_traj = self.x_var.value[:, :] + x_target.reshape(-1, 1)
         u_traj = self.u_var.value[:, :] + u_target.reshape(-1, 1)

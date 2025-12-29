@@ -16,8 +16,8 @@ class MPCControl_yvel(MPCControl_base):
         #################################################
         # YOUR CODE HERE
         print("setting up yvel")
-        self.Q = 1 * np.eye(self.nx)
-        self.R = 1 * np.eye(self.nu)
+        self.Q = np.diag([1, 1, 1])
+        self.R = np.diag([0.5])
 
         # Input constraints: u in U = { u | Mu <= m }
         # delta_1: -0.26 <= delta_1 <= 0.26

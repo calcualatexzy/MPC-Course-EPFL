@@ -16,20 +16,17 @@ class MPCControl_xvel(MPCControl_base):
         #################################################
         # YOUR CODE HERE
         print("setting up xvel")
-        self.Q = 1 * np.eye(self.nx)
-        self.R = 1 * np.eye(self.nu)
+        self.Q = np.diag([1, 1, 1])
+        self.R = np.diag([0.5])
         
         # Input constraints: u in U = { u | Mu <= m }
         # delta_2: -0.26 <= delta_2 <= 0.26
-        self.M = np.array([[1], [-1]])  # [delta_2 <= delta_max, -delta_2 <= delta_max]
+        self.M = np.array([[1], [-1]])  # [delta_2 <= delta_max, -delta_2 <= -delta_min]
         self.m = np.array([self.params['delta'][1], -self.params['delta'][0]])
         self.U = Polyhedron.from_Hrep(self.M, self.m)
         
         # State constraints: x in X = { x | Fx <= f }
-        # omega_y: -10 <= omega_y <= 10
         # beta: -0.1745 <= beta <= 0.1745
-        # v_x: -10 <= v_x <= 10
-        # x: -10 <= x <= 10
         self.F = np.array([
             [0, 1, 0],   # beta <= beta_max
             [0, -1, 0],  # -beta <= beta_max (i.e., beta >= -beta_max)
