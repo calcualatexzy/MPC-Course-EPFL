@@ -28,6 +28,14 @@ class MPCVelControl:
 
         return self
 
+    def setup_estimators(self) -> None:
+        """Setup disturbance estimators for offset-free MPC (Part 5)"""
+        # Setup estimator for z-velocity controller (main one affected by mass uncertainty)
+        self.mpc_z.setup_estimator()
+        # Optionally setup for other controllers if needed:
+        # self.mpc_x.setup_estimator()
+        # self.mpc_y.setup_estimator()
+
     def load_controllers(
         self,
         mpc_x: MPCControl_xvel,
@@ -43,7 +51,19 @@ class MPCVelControl:
         return self
 
     def estimate_parameters(self, x_data: np.ndarray, u_data: np.ndarray) -> None:
-        return
+        """Update disturbance estimates for offset-free MPC (Part 5)
+        
+        Args:
+            x_data: State data, shape (12, 2) - states at time k and k+1
+            u_data: Input data, shape (4, 1) - input at time k
+        """
+        # Update z-velocity estimator if it has been setup
+        if hasattr(self.mpc_z, 'x_hat') and self.mpc_z.x_hat is not None:
+            # x_data[:, 1] is the current measurement (state at k+1)
+            # u_data[:, 0] is the previous input (at time k)
+            x_z = x_data[self.mpc_z.x_ids, 1]  # v_z at k+1
+            u_z = u_data[self.mpc_z.u_ids, 0]  # P_avg at k
+            self.mpc_z.update_estimator(x_z, u_z)
 
     def get_u(
         self,

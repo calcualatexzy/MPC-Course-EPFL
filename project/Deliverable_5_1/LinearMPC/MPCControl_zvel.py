@@ -54,6 +54,29 @@ class MPCControl_zvel(MPCControl_base):
         if u_target is None:
             u_target = self.us
 
+        # Offset-free MPC: compute steady-state target (x_s, u_s) that compensates for disturbance
+        # Solve: [I-A  -B] [x_s]   [-Bd * d]
+        #        [C    0 ] [u_s] = [y_ref  ]
+        # where y_ref = C @ x_target (we want output to track reference)
+        if hasattr(self, 'd_estimate') and self.d_estimate is not None:
+            d = self.d_estimate.flatten()
+            Bd = self.B  # Bd = B in this system
+            C = np.eye(self.nx)  # Full state feedback (ny = nx)
+            y_ref = C @ x_target  # Reference output
+            
+            # Build and solve the target calculation problem
+            # [I-A  -B] [x_s]   [-Bd * d]
+            # [C    0 ] [u_s] = [y_ref  ]
+            M = np.block([
+                [np.eye(self.nx) - self.A, -self.B],
+                [C, np.zeros((self.nx, self.nu))]
+            ])
+            rhs = np.concatenate([-Bd @ d, y_ref])
+            
+            target = np.linalg.solve(M, rhs)
+            x_target = target[:self.nx]
+            u_target = target[self.nx:]
+
         self.x0_var.value = x0 - x_target
 
         # Constraints
@@ -99,32 +122,31 @@ class MPCControl_zvel(MPCControl_base):
         self.ny = 1
         self.nd = 1
 
-        self.d_estimate = np.zeros((self.nd, 1))
-        self.d_gain = 1.0
-
         poles = np.array([0.5, 0.6])
 
         C = np.ones((self.ny, self.nx))
-        Bd = self.B
+        Cd = np.ones((self.ny, self.nd))  # Cd for output equation
+        Bd = self.B  # Disturbance affects state through same channel as input
 
         # A_hat = [A  Bd;  0  I]
         self.A_hat = np.vstack((
             np.hstack((self.A, Bd)),
-            np.hstack((np.zeros((self.ny, self.nx)), np.eye(self.ny)))
+            np.hstack((np.zeros((self.nd, self.nx)), np.eye(self.nd)))
         ))
 
         # B_hat = [B; 0]
         self.B_hat = np.vstack((self.B, np.zeros((self.nd, self.nu))))
 
         # C_hat = [C  Cd]
-        self.C_hat = np.hstack((C, np.ones((self.ny,self.nd))))
+        self.C_hat = np.hstack((C, Cd))
 
         from scipy.signal import place_poles
         res = place_poles(self.A_hat.T, self.C_hat.T, poles)
         self.L = -res.gain_matrix.T
 
-        self.x_hat = np.ndarray((1, self.nx))
-        self.d_estimate = np.ndarray((1, self.nd))
+        # Initialize state estimates as 1D arrays
+        self.x_hat = np.zeros((self.nx,))
+        self.d_estimate = np.zeros((self.nd,))
 
         # YOUR CODE HERE
         ##################################################
@@ -133,8 +155,20 @@ class MPCControl_zvel(MPCControl_base):
         # FOR PART 5 OF THE PROJECT
         ##################################################
         # YOUR CODE HERE
-        tmp = self.A_hat @ np.concatenate((self.x_hat, self.d_estimate)) + self.B_hat @ u_data + self.L @ (self.C_hat @ self.x_hat + self.d_gain * self.d_estimate - self.C_hat @ x_data)
-        self.x_hat = tmp[:self.nx]
-        self.d_estimate = tmp[self.nx:]
+        # x_data is the measured output y (v_z)
+        y = x_data.flatten()
+
+        # Augmented state: [x_hat; d_estimate]
+        x_aug = np.concatenate((self.x_hat, self.d_estimate))
+
+        # Predicted output: y_hat = C_hat @ x_aug
+        y_hat = self.C_hat @ x_aug
+
+        # Luenberger observer update:
+        # x_aug_next = A_hat @ x_aug + B_hat @ u + L @ (y - y_hat)
+        x_aug_next = self.A_hat @ x_aug + self.B_hat @ u_data.flatten() + self.L @ (y_hat - y)
+
+        self.x_hat = x_aug_next[:self.nx]
+        self.d_estimate = x_aug_next[self.nx:]
         # YOUR CODE HERE
         ##################################################
