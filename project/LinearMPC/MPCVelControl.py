@@ -17,14 +17,21 @@ class MPCVelControl:
     def __init__(self) -> None:
         pass
 
-    def new_controller(self, rocket: Rocket, Ts: float, H: float) -> None:
+    def new_controller(
+        self,
+        rocket: Rocket,
+        Ts: float,
+        H: float,
+        use_soft_constraints: bool = False,
+        slack_penalty_weight: float = 100.0,
+    ) -> None:
         self.xs, self.us = rocket.trim()
         A, B = rocket.linearize(self.xs, self.us)
 
-        self.mpc_x = MPCControl_xvel(A, B, self.xs, self.us, Ts, H)
-        self.mpc_y = MPCControl_yvel(A, B, self.xs, self.us, Ts, H)
-        self.mpc_z = MPCControl_zvel(A, B, self.xs, self.us, Ts, H)
-        self.mpc_roll = MPCControl_roll(A, B, self.xs, self.us, Ts, H)
+        self.mpc_x = MPCControl_xvel(A, B, self.xs, self.us, Ts, H, use_soft_constraints, slack_penalty_weight)
+        self.mpc_y = MPCControl_yvel(A, B, self.xs, self.us, Ts, H, use_soft_constraints, slack_penalty_weight)
+        self.mpc_z = MPCControl_zvel(A, B, self.xs, self.us, Ts, H, use_soft_constraints, slack_penalty_weight)
+        self.mpc_roll = MPCControl_roll(A, B, self.xs, self.us, Ts, H, use_soft_constraints, slack_penalty_weight)
 
         return self
 

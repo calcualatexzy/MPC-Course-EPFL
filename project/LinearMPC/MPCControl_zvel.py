@@ -63,8 +63,19 @@ class MPCControl_zvel(MPCControl_base):
         # System dynamics
         self.constraints.append(self.x_var[:, 1:] == self.A @ self.x_var[:, :-1] + self.B @ self.u_var)
 
-        # State constraints for delta form
-        self.constraints.append(self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1))
+        # State constraints for delta form (soft or hard)
+        if self.use_soft_constraints:
+            # Soft constraints: allow violation with penalty
+            self.constraints.append(
+                self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1) + self.epsilon
+            )
+            total_cost = self.cost + self.slack_penalty_weight * cp.sum(self.epsilon)
+        else:
+            # Hard constraints
+            self.constraints.append(
+                self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1)
+            )
+            total_cost = self.cost
 
         # Input constraints for delta form
         self.constraints.append(self.U.A @ self.u_var <= (self.U.b - self.U.A @ u_target).reshape(-1, 1))
@@ -77,7 +88,7 @@ class MPCControl_zvel(MPCControl_base):
         self.O_inf = max_invariant_set(self.A_cl, X.intersect(KU))
         self.constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
 
-        self.ocp = cp.Problem(cp.Minimize(self.cost), self.constraints)
+        self.ocp = cp.Problem(cp.Minimize(total_cost), self.constraints)
 
         self.ocp.solve()
         # import IPython; IPython.embed();

@@ -49,6 +49,10 @@ class MPCControl_base:
     """Optimization problem"""
     ocp: cp.Problem
 
+    """Soft constraints settings"""
+    use_soft_constraints: bool
+    slack_penalty_weight: float
+
     def __init__(
         self,
         A: np.ndarray,
@@ -57,12 +61,18 @@ class MPCControl_base:
         us: np.ndarray,
         Ts: float,
         H: float,
+        use_soft_constraints: bool = False,
+        slack_penalty_weight: float = 100.0,
     ) -> None:
         self.Ts = Ts
         self.H = H
         self.N = int(H / Ts)
         self.nx = self.x_ids.shape[0]
         self.nu = self.u_ids.shape[0]
+
+        # Soft constraints configuration
+        self.use_soft_constraints = use_soft_constraints
+        self.slack_penalty_weight = slack_penalty_weight
 
         # System definition
         xids_xi, xids_xj = np.meshgrid(self.x_ids, self.x_ids)
@@ -110,6 +120,11 @@ class MPCControl_base:
         self.u_var = cp.Variable((self.nu, self.N), name='u')
         self.x0_var = cp.Parameter((self.nx,), name='x0')
 
+        # Slack variable for soft state constraints (if enabled)
+        if self.use_soft_constraints:
+            num_state_constraints = self.X.A.shape[0]
+            self.epsilon = cp.Variable((num_state_constraints, self.N), nonneg=True, name='slack')
+
         # Costs 
         self.cost = 0
 
@@ -156,8 +171,18 @@ class MPCControl_base:
 
         #self.constraints.append(self.O_inf.A @ self.x_var[:, -1] <= self.O_inf.b.reshape(-1, 1))
 
-        # State constraints for delta form
-        self.constraints.append(self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1))
+        # State constraints for delta form (soft or hard)
+        if self.use_soft_constraints:
+            # Soft constraints: allow violation with penalty
+            self.constraints.append(
+                self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1) + self.epsilon
+            )
+            self.cost += self.slack_penalty_weight * cp.sum(self.epsilon)
+        else:
+            # Hard constraints
+            self.constraints.append(
+                self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1)
+            )
 
         # Input constraints for delta form
         self.constraints.append(self.U.A @ self.u_var <= (self.U.b - self.U.A @ u_target).reshape(-1, 1))
@@ -172,7 +197,11 @@ class MPCControl_base:
 
         self.ocp = cp.Problem(cp.Minimize(self.cost), self.constraints)
 
-        self.ocp.solve()
+        self.ocp.solve()  
+        
+        # Debug: print solver status if failed
+        if self.ocp.status != 'optimal':
+            print(f"  Solver status: {self.ocp.status}")
 
         u0 = self.u_var.value[:, 0] + u_target
         x_traj = self.x_var.value[:, :] + x_target.reshape(-1, 1)

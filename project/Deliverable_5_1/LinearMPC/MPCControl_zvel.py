@@ -86,8 +86,18 @@ class MPCControl_zvel(MPCControl_base):
         # System dynamics
         self.constraints.append(self.x_var[:, 1:] == self.A @ self.x_var[:, :-1] + self.B @ self.u_var)
 
-        # State constraints for delta form
-        self.constraints.append(self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1))
+        # State constraints for delta form (soft or hard)
+        if self.use_soft_constraints:
+            # Soft constraints: allow violation with penalty
+            self.constraints.append(
+                self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1) + self.epsilon
+            )
+            self.cost += self.slack_penalty_weight * cp.sum(self.epsilon)
+        else:
+            # Hard constraints
+            self.constraints.append(
+                self.X.A @ self.x_var[:, :-1] <= (self.X.b - self.X.A @ x_target).reshape(-1, 1)
+            )
 
         # Input constraints for delta form
         self.constraints.append(self.U.A @ self.u_var <= (self.U.b - self.U.A @ u_target).reshape(-1, 1))
