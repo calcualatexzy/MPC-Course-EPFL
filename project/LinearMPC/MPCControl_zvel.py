@@ -22,8 +22,8 @@ class MPCControl_zvel(MPCControl_base):
         # YOUR CODE HERE
 
         print("setting up zvel")
-        self.Q = np.diag([10])
-        self.R = np.diag([0.5])
+        self.Q = np.diag([1])
+        self.R = np.diag([1])
 
         # Input constraints: u in U = { u | Mu <= m }
         # P_avg: 40 <= P_avg <= 80

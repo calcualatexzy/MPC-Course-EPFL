@@ -16,8 +16,8 @@ class MPCControl_xvel(MPCControl_base):
         #################################################
         # YOUR CODE HERE
         print("setting up xvel")
-        self.Q = np.diag([1, 1, 1])
-        self.R = np.diag([0.5])
+        self.Q = np.diag([10, 1, 1])
+        self.R = np.diag([1])
         
         # Input constraints: u in U = { u | Mu <= m }
         # delta_2: -0.26 <= delta_2 <= 0.26

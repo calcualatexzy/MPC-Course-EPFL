@@ -16,8 +16,8 @@ class MPCControl_roll(MPCControl_base):
         #################################################
         # YOUR CODE HERE
         print("setting up roll")
-        self.Q = np.diag([5, 400])
-        self.R = np.diag([0.5])
+        self.Q = np.diag([1, 20])
+        self.R = np.diag([1])
 
         # Input constraints: u in U = { u | Mu <= m }
         # Pdiff: -20 <= Pdiff <= 20

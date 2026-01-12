@@ -2,10 +2,10 @@ import numpy as np
 
 from src.rocket import Rocket
 
-from .MPCControl_roll import MPCControl_roll
-from .MPCControl_xvel import MPCControl_xvel
-from .MPCControl_yvel import MPCControl_yvel
-from .MPCControl_zvel import MPCControl_zvel
+from LinearMPC_3_1.MPCControl_roll import MPCControl_roll
+from LinearMPC_3_1.MPCControl_xvel import MPCControl_xvel
+from LinearMPC_3_1.MPCControl_yvel import MPCControl_yvel
+from LinearMPC_3_1.MPCControl_zvel import MPCControl_zvel
 
 
 class MPCVelControl:
